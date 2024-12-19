@@ -18,6 +18,16 @@ async function main() {
 
   await new Promise((res) => setTimeout(res, 1000))
   addLine(`Keep in mind that this is only an estimate and current review delays will vary`)
+
+  await new Promise((res) => setTimeout(res, 5000))
+  const p = document.createElement('p')
+  p.textContent = 'Made by Misode - Check out '
+  const a = document.createElement('a')
+  a.textContent = 'this project on GitHub'
+  a.href = 'https://github.com/misode/modrinth-delay-estimator'
+  a.target = '_blank'
+  p.appendChild(a)
+  document.body.appendChild(p)
 }
 
 function addLine(text) {
