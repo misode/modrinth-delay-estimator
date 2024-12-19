@@ -9,7 +9,7 @@ async function main() {
   const projects = await api(`projects?ids=${JSON.stringify(ids)}`)
 
   projects.sort((a, b) => new Date(a.approved) > new Date(b.approved) ? -1 : 0)
-  addLine(`The most recent project in search "${projects[0].title}" was approved ${formatDuration(new Date(projects[0].approved))} ago`)
+  addLine(`The most recent project "${projects[0].title}" was approved ${formatDuration(new Date(projects[0].approved))} ago`)
 
   const delays = projects.map(p => new Date(p.approved) - new Date(p.queued))
   const avgDelay = delays.reduce((a, b) => a + b, 0) / delays.length
@@ -41,12 +41,10 @@ function formatDuration(date) {
   const days = Math.floor(diff / 86400);
   const hours = Math.floor((diff % 86400) / 3600);
   const minutes = Math.floor((diff % 3600) / 60);
-  const seconds = diff % 60;
   const parts = [];
   if (days > 0) parts.push(`${days} days`);
   if (hours > 0) parts.push(`${hours} hours`);
   if (minutes > 0) parts.push(`${minutes} minutes`);
-  if (seconds > 0) parts.push(`${seconds} seconds`);
   return parts.slice(0, 2).join(" and ");
 }
 
