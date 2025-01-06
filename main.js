@@ -1,23 +1,36 @@
 const API = 'https://api.modrinth.com/v2'
 const USER_AGENT = 'github.com/misode/modrinth-delay-estimator'
+const SAMPLE_SIZE = 25
+
+const PROJECT_TYPES = {
+  mod: [["project_type:mod"],["project_types!=datapack"],["project_types!=plugin"]],
+  datapack: [["project_type:datapack"]],
+  plugin: [["project_type:plugin"]],
+  resourcepack: [["project_type:resourcepack"]],
+  shader: [["project_type:shader"]],
+  modpack: [["project_type:modpack"]],
+}
 
 async function main() {
-  addLine(`Analyzing the 25 newest projects in search...`)
+  addLine(`Analyzing the ${SAMPLE_SIZE} newest projects of each type in search...`)
+  document.body.appendChild(document.createElement('br'))
 
-  const search = await api(`search?index=newest&limit=25`)
-  const ids = search.hits.map(p => p.project_id)
-  const projects = await api(`projects?ids=${JSON.stringify(ids)}`)
+  const allProjects = []
+  for (const [projectType, facets] of Object.entries(PROJECT_TYPES)) {
+    const projects = await downloadProjects(facets)
+    allProjects.push(...projects)
+    const top = projects[0]
+    addLine(`The most recently <strong>${projectType}</strong> "<a href="https://modrinth.com/project/${top.id}" target="_blank">${top.title}</a>" was approved ${formatDuration(new Date() - top.approved)} ago`)
+    addLine(`The average review time for these projects was <strong>${formatDuration(avgDelay(projects))}</strong>`)
+    document.body.appendChild(document.createElement('br'))
+  }
 
-  projects.sort((a, b) => new Date(a.approved) > new Date(b.approved) ? -1 : 0)
-  addLine(`The most recent project "${projects[0].title}" was approved ${formatDuration(new Date(projects[0].approved))} ago`)
-
-  const delays = projects.map(p => new Date(p.approved) - new Date(p.queued))
-  const avgDelay = delays.reduce((a, b) => a + b, 0) / delays.length
-  await new Promise((res) => setTimeout(res, 400))
-  addLine(`The average review time for these projects was ${formatDuration(avgDelay)}`)
+  addLine(`Combined, the average review time for all these projects was <strong>${formatDuration(avgDelay(allProjects))}</strong>`)
+  document.body.appendChild(document.createElement('br'))
 
   await new Promise((res) => setTimeout(res, 1000))
   addLine(`Keep in mind that this is only an estimate and current review delays will vary`)
+  document.body.appendChild(document.createElement('br'))
 
   await new Promise((res) => setTimeout(res, 5000))
   const p = document.createElement('p')
@@ -32,12 +45,12 @@ async function main() {
 
 function addLine(text) {
   const p = document.createElement('p')
-  p.textContent = text
+  p.innerHTML = text
   document.body.appendChild(p)
 }
 
 function formatDuration(date) {
-  const diff = typeof date === 'number' ? Math.floor(date / 1000) : Math.floor((new Date() - date) / 1000)
+  const diff = Math.floor(date / 1000)
   const days = Math.floor(diff / 86400);
   const hours = Math.floor((diff % 86400) / 3600);
   const minutes = Math.floor((diff % 3600) / 60);
@@ -46,6 +59,35 @@ function formatDuration(date) {
   if (hours > 0) parts.push(`${hours} hours`);
   if (minutes > 0) parts.push(`${minutes} minutes`);
   return parts.slice(0, 2).join(" and ");
+}
+
+async function downloadProjects(facets) {
+  const url = `search?index=newest&limit=${SAMPLE_SIZE}&facets=${encodeURIComponent(JSON.stringify(facets))}`
+  console.log(facets, url)
+  const search = await api(url)
+  const ids = search.hits.map(p => p.project_id)
+  const projects = await api(`projects?ids=${JSON.stringify(ids)}`)
+  projects.sort((a, b) => new Date(a.approved) > new Date(b.approved) ? -1 : 0)
+
+  return projects.map(p => ({
+    id: p.id,
+    title: p.title,
+    approved: new Date(p.approved),
+    queued: new Date(p.queued),
+    delay: new Date(p.approved) - new Date(p.queued)
+  }))
+}
+
+function avgDelay(projects) {
+  let totalDelay = 0
+  const accountedProjects = new Set()
+  for (const project of projects) {
+    if (!accountedProjects.has(project.id)) {
+      totalDelay += project.delay
+    }
+    accountedProjects.add(project.id)
+  }
+  return totalDelay / accountedProjects.size
 }
 
 async function api(url) {
