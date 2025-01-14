@@ -1,6 +1,6 @@
 const API = 'https://api.modrinth.com/v2'
 const USER_AGENT = 'github.com/misode/modrinth-delay-estimator'
-const SAMPLE_SIZE = 25
+const SAMPLE_SIZE = 50
 
 const PROJECT_TYPES = {
   mod: [["project_type:mod"],["project_types!=datapack"],["project_types!=plugin"]],
@@ -63,19 +63,27 @@ function formatDuration(date) {
 
 async function downloadProjects(facets) {
   const url = `search?index=newest&limit=${SAMPLE_SIZE}&facets=${encodeURIComponent(JSON.stringify(facets))}`
-  console.log(facets, url)
   const search = await api(url)
   const ids = search.hits.map(p => p.project_id)
   const projects = await api(`projects?ids=${JSON.stringify(ids)}`)
   projects.sort((a, b) => new Date(a.approved) > new Date(b.approved) ? -1 : 0)
 
-  return projects.map(p => ({
-    id: p.id,
-    title: p.title,
-    approved: new Date(p.approved),
-    queued: new Date(p.queued),
-    delay: new Date(p.approved) - new Date(p.queued)
-  }))
+  let results = []
+  for (const p of projects) {
+    const approved = new Date(p.approved)
+    const queued = new Date(p.queued)
+    if (approved.getUTCFullYear() < 2000 || queued.getFullYear() < 2000) {
+      continue
+    }
+    results.push({
+      id: p.id,
+      title: p.title,
+      approved,
+      queued,
+      delay: approved - queued,
+    })
+  }
+  return results
 }
 
 function avgDelay(projects) {
